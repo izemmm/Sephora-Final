@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useCartStore } from '~/stores/cart'
 
-// Sepet verilerini çekiyoruz
+// 1. Store'u çağır
 const cartStore = useCartStore()
 
-// Toplam fiyatı hesaplayalım (Basitçe string fiyatı sayıya çevirip topluyoruz)
-const cartTotal = computed(() => {
-  return cartStore.items.length * 1149 // Örnek fiyat, gerçekte item.price parse edilmeli
+// 2. Çift Header sorununu çözmek için bu sayfada boş layout kullan
+definePageMeta({
+  layout: 'custom'
 })
+
+// NOT: Elle 'computed' hesaplamasına gerek yok!
+// cartStore.totalPrice zaten bize en doğru sonucu veriyor.
 </script>
 
 <template>
@@ -65,7 +67,7 @@ const cartTotal = computed(() => {
                 <p class="item-variant">Standart Boy</p>
 
                 <div class="actions">
-                  <select class="qty-select">
+                  <select class="qty-select" :value="item.quantity || 1">
                     <option>1</option>
                     <option>2</option>
                     <option>3</option>
@@ -75,7 +77,7 @@ const cartTotal = computed(() => {
               </div>
 
               <div class="item-price">
-                {{ item.price }}
+                {{ typeof item.price === 'number' ? item.price + ' TL' : item.price }}
               </div>
             </div>
           </div>
@@ -103,7 +105,7 @@ const cartTotal = computed(() => {
           
           <div class="summary-row">
             <span>Ara toplam</span>
-            <span>{{ cartStore.items.length > 0 ? '1.149 TL' : '0 TL' }}</span>
+            <span>{{ cartStore.totalPrice }}</span>
           </div>
           
           <div class="summary-row">
@@ -124,7 +126,7 @@ const cartTotal = computed(() => {
 
           <div class="total-row">
             <span>Ürünlerin Toplam Tutarı</span>
-            <span>{{ cartStore.items.length > 0 ? '1.149 TL' : '0 TL' }}</span>
+            <span>{{ cartStore.totalPrice }}</span>
           </div>
           <p class="tax-info">KDV dahil</p>
 
@@ -144,7 +146,6 @@ const cartTotal = computed(() => {
   font-family: 'Helvetica Neue', Arial, sans-serif;
   background-color: #f6f6f6; 
   min-height: 100vh;
-  /* Header'ın altında kalmasın diye padding eklenebilir ama senin tasarımında sade header var */
 }
 
 /* 1. Üst Banner */
