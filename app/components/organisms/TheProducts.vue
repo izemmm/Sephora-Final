@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useProductStore } from '~/stores/productStore'
+// YENİ: Favori Store'u ekledik
+import { useFavoriteStore } from '~/stores/favoriteStore'
 
 const productStore = useProductStore()
+const favoriteStore = useFavoriteStore() // Store'u tanımladık
 const sliderRef = ref<HTMLElement | null>(null)
 
 // Buton durumları
@@ -24,6 +27,23 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', checkScrollPosition)
 })
+
+// --- YENİ: FAVORİ EKLEME FONKSİYONU ---
+const addToFavorites = async (product: any) => {
+  try {
+    await favoriteStore.addFavorite(product)
+    alert("❤️ Ürün favorilere eklendi!")
+  } catch (error: any) {
+    // Eğer store'dan hata dönerse (giriş yapılmamışsa)
+    if (error.message === "Giriş yapmalısın!") {
+       alert("Favorilere eklemek için lütfen giriş yapın.")
+    } else {
+       console.error(error)
+       alert("Bir hata oluştu.")
+    }
+  }
+}
+// --------------------------------------
 
 const checkScrollPosition = () => {
   if (!sliderRef.value) return
@@ -93,7 +113,8 @@ const scrollSlider = (direction: 'left' | 'right') => {
       >
         <div v-for="product in productStore.products" :key="product.id" class="product-card">
           <div class="card-badge">2 Ve Üzeri İndirim</div>
-          <div class="wishlist-icon">
+          
+          <div class="wishlist-icon" @click="addToFavorites(product)">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
           </div>
           

@@ -12,18 +12,17 @@ export const useCartStore = defineStore('cart', {
     totalPrice: (state) => {
       let total = 0
       state.items.forEach(item => {
-        // Fiyat temizleme mantığını tekrar kullanmamak için aşağıda helper yaptık ama
-        // mevcut yapını bozmadan burayı böyle bırakıyorum, mantık doğru.
         let rawPrice = item.price
         let finalPrice = 0
 
         if (typeof rawPrice === 'number') {
           finalPrice = rawPrice
         } else {
+          // "1.250 TL" gibi string fiyatları sayıya çevir
           let cleanString = String(rawPrice)
-          cleanString = cleanString.replace(/\./g, '')
-          cleanString = cleanString.replace(',', '.')
-          cleanString = cleanString.replace(/[^0-9.]/g, '')
+          cleanString = cleanString.replace(/\./g, '') // Binlik ayırıcıyı sil
+          cleanString = cleanString.replace(',', '.')  // Virgülü nokta yap
+          cleanString = cleanString.replace(/[^0-9.]/g, '') // Harfleri sil
           finalPrice = parseFloat(cleanString)
         }
 
@@ -32,11 +31,11 @@ export const useCartStore = defineStore('cart', {
           total += finalPrice * quantity
         }
       })
+      // Sonucu Türk Lirası formatında döndür
       return total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL"
     },
     
-    // YENİ EKLENEN: Tek bir ürünün toplam fiyatını hesaplamak için (Adet x Birim Fiyat)
-    // Bunu ürün kartında "3.015 TL" yazan yerde kullanacaksın.
+    // Tek bir ürünün toplam fiyatını hesapla (Adet x Birim Fiyat)
     getItemTotal: (state) => (item: any) => {
         let rawPrice = item.price
         let finalPrice = 0
@@ -68,21 +67,26 @@ export const useCartStore = defineStore('cart', {
       }
     },
 
-    addToCart(item: any) {
-      // Ürüne varsayılan olarak quantity 1 ekleyelim (yoksa)
-      if(!item.quantity) {
-          item.quantity = 1;
+    addToCart(newItem: any) {
+      // 1. Sepette bu ürün zaten var mı diye kontrol et
+      const existingItem = this.items.find(item => item.id === newItem.id)
+
+      if (existingItem) {
+        // VARSA: Sadece miktarını 1 arttır
+        existingItem.quantity = (existingItem.quantity || 1) + 1
+      } else {
+        // YOKSA: Yeni ürün olarak ekle ve miktarını 1 yap
+        // (Reaktifliği koparmak için {...newItem} ile kopyalıyoruz)
+        this.items.push({ ...newItem, quantity: 1 })
       }
-      this.items.push(item)
+
       this.saveToLocalStorage()
     },
 
-    // --- YENİ EKLENEN FONKSİYON ---
-    // Dropdown değişince bunu çağıracaksın
     updateQuantity(itemId: any, quantity: number) {
       const item = this.items.find(i => i.id === itemId)
       if (item) {
-        item.quantity = parseInt(String(quantity)) // Gelen veriyi sayıya çevirip kaydet
+        item.quantity = parseInt(String(quantity))
         this.saveToLocalStorage()
       }
     },
@@ -93,6 +97,12 @@ export const useCartStore = defineStore('cart', {
         this.items.splice(index, 1)
         this.saveToLocalStorage()
       }
+    },
+
+    // YENİ EKLENEN: Sipariş tamamlanınca sepeti boşaltmak için
+    clearCart() {
+      this.items = []
+      this.saveToLocalStorage()
     },
 
     saveToLocalStorage() {

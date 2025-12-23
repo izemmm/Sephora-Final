@@ -1,25 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { initializeApp, getApps } from 'firebase/app'
-import { createUserWithEmailAndPassword, updateProfile, getAuth } from 'firebase/auth'
+// Firebase importlarını kaldırdık, çünkü artık Store kullanıyoruz
+import { useUserStore } from '~/stores/userStore'
 
 const router = useRouter()
 const route = useRoute()
-
-// 1. SENİN YOLLADIĞIN GERÇEK FIREBASE AYARLARI (ARTIK HATA VERMEZ)
-const firebaseConfig = {
-  apiKey: "AIzaSyC0f37SFaytuQasCYivzzGnGcl1xvZ4f3k",
-  authDomain: "sephora-final-30172.firebaseapp.com",
-  projectId: "sephora-final-30172",
-  storageBucket: "sephora-final-30172.firebasestorage.app",
-  messagingSenderId: "567702651968",
-  appId: "1:567702651968:web:ffa05b3d9a214e87368ba5"
-};
-
-// Uygulama daha önce başlamadıysa başlat
-if (getApps().length === 0) {
-  initializeApp(firebaseConfig);
-}
+const userStore = useUserStore() // Store'u çağırdık
 
 // Form Verileri
 const form = ref({
@@ -68,21 +54,12 @@ const handleRegister = async () => {
     errorMessage.value = ''
 
     try {
-      // Başlatılmış Firebase'den yetkiyi al
-      const auth = getAuth() 
+      // --- BURASI DEĞİŞTİ: ARTIK STORE KULLANIYORUZ ---
+      // userStore içindeki registerUser fonksiyonu hem Auth kaydını yapıyor
+      // hem de 'users' koleksiyonuna verileri yazıyor.
+      await userStore.registerUser(form.value)
       
-      // Kullanıcıyı oluştur
-      const userCredential = await createUserWithEmailAndPassword(auth, form.value.email, form.value.password)
-      
-      // İsmini profiline kaydet
-      if (userCredential.user) {
-        await updateProfile(userCredential.user, {
-          displayName: `${form.value.name} ${form.value.surname}`
-        })
-      }
-      
-      // Başarılıysa anasayfaya yönlendir
-      console.log("Kayıt başarılı:", userCredential.user.email)
+      console.log("Kayıt başarılı")
       router.push('/')
       
     } catch (error: any) {

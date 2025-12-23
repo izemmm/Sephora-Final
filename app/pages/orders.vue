@@ -2,15 +2,15 @@
 import { ref, onMounted } from 'vue'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
 import { getFirestore, doc, getDoc } from 'firebase/firestore' 
-import { useFavoriteStore } from '~/stores/favoriteStore'
+import { useOrderStore } from '~/stores/orderStore'
 
-const favoriteStore = useFavoriteStore()
+const orderStore = useOrderStore()
 const router = useRouter()
-const activeItem = ref('FAVORİLERİM') 
+const activeItem = ref('SİPARİŞLERİM') 
 const currentUser = ref<any>(null)
-const currentUserName = ref('') 
+const currentUserName = ref('')
 
-// --- MENÜ DATALARI (YENİ VE ORİJİNAL İKONLAR) ---
+// MENÜ DATALARI (SVG İKONLARI - ORİJİNAL)
 const menuItems = [
   { 
     name: 'HESABIM', 
@@ -66,7 +66,6 @@ const menuItems = [
 ]
 
 const handleMenuClick = (item: any) => {
-  activeItem.value = item.name
   if (item.link && item.link !== '#') {
     router.push(item.link)
   }
@@ -80,13 +79,12 @@ const handleLogout = async () => {
 
 onMounted(() => {
   const auth = getAuth()
-  const db = getFirestore() 
+  const db = getFirestore()
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       currentUser.value = user
-      favoriteStore.fetchFavorites()
-
+      await orderStore.fetchOrders()
       try {
         const docRef = doc(db, "users", user.uid)
         const docSnap = await getDoc(docRef)
@@ -99,16 +97,14 @@ onMounted(() => {
         currentUserName.value = user.displayName || 'MİSAFİR'
       }
     } else {
-      currentUser.value = null
-      currentUserName.value = ''
-      favoriteStore.items = []
+      router.push('/login')
     }
   })
 })
 </script>
 
 <template>
-  <div class="favorites-page-wrapper">
+  <div class="page-wrapper">
     <div class="layout-container">
       
       <aside class="sidebar-container">
@@ -127,12 +123,12 @@ onMounted(() => {
             :key="index" 
             class="menu-item"
             :class="{ 'active-item': activeItem === item.name }"
-            @click="handleMenuClick(item)" 
+            @click="handleMenuClick(item)"
           >
             <div v-if="activeItem === item.name" class="active-line"></div>
             
             <div class="icon-box" :class="{ 'red-icon': activeItem === item.name }">
-               <svg 
+              <svg 
                 viewBox="0 0 24 24" 
                 width="20" height="20" 
                 fill="none" 
@@ -151,38 +147,48 @@ onMounted(() => {
         </ul>
 
         <div class="logout-wrapper">
-            <button v-if="currentUser" @click="handleLogout" class="logout-btn">Çıkış yap</button>
+          <button @click="handleLogout" class="logout-btn">Çıkış yap</button>
         </div>
       </aside>
 
       <main class="main-content">
-        <h1 class="page-heading">Favorilerim</h1>
+        <h1 class="page-heading">Siparişlerim</h1>
         
-        <div v-if="!currentUser" class="content-body">
-          <p class="description-text">
-            Favorilerini eklemeye hemen başla!<br>
-            Favori ürünlerini kaydetmek ve paylaşmak için giriş yap.
-          </p>
-          <NuxtLink to="/login" class="main-login-btn">Giriş</NuxtLink>
+        <div v-if="orderStore.loading" class="status-msg">
+          Siparişlerin yükleniyor...
         </div>
 
-        <div v-else-if="favoriteStore.items.length === 0" class="content-body">
-             <p class="description-text">Henüz favorilere eklenmiş bir ürünün yok.</p>
+        <div v-else-if="orderStore.orders.length === 0" class="content-body">
+             <p class="description-text">Henüz vermiş olduğun bir sipariş bulunmuyor.</p>
              <NuxtLink to="/" class="continue-link">Alışverişe Başla</NuxtLink>
         </div>
 
-        <div v-else class="favorites-grid">
-            <div v-for="item in favoriteStore.items" :key="item.docId" class="fav-card">
-                <div class="fav-img">
-                    <img :src="item.productImage" :alt="item.productName" />
+        <div v-else class="orders-list">
+            <div v-for="order in orderStore.orders" :key="order.id" class="order-card">
+                <div class="order-header">
+                    <div class="header-left">
+                        <span class="date-label">Sipariş Tarihi:</span>
+                        <span class="order-date">{{ order.formattedDate }}</span>
+                        <span class="status-badge">{{ order.status }}</span>
+                    </div>
+                    <div class="header-right">
+                        <span class="total-label">Toplam:</span>
+                        <span class="total-price">{{ order.totalAmount }}</span>
+                    </div>
                 </div>
-                <div class="fav-info">
-                    <h3>{{ item.productName }}</h3>
-                    <p class="price">{{ item.productPrice }}</p>
+
+                <div class="order-items">
+                    <div v-for="(item, idx) in order.items" :key="idx" class="order-item-row">
+                        <div class="item-img">
+                             <img v-if="item.image" :src="item.image" :alt="item.name">
+                             <div v-else class="placeholder"></div>
+                        </div>
+                        <div class="item-info">
+                            <p class="item-name">{{ item.name }}</p>
+                            <p class="item-qty">Adet: {{ item.quantity || 1 }}</p>
+                        </div>
+                    </div>
                 </div>
-                <button @click="favoriteStore.removeFavorite(item.docId)" class="remove-fav-btn">
-                    Kaldır
-                </button>
             </div>
         </div>
 
@@ -195,7 +201,7 @@ onMounted(() => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-.favorites-page-wrapper {
+.page-wrapper {
   background-color: #FAFAFA;
   min-height: 100vh;
   padding-top: 50px; 
@@ -227,7 +233,7 @@ onMounted(() => {
 
 .header-content {
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; /* İsim sola, Kart sağa */
   align-items: center;
 }
 
@@ -239,9 +245,9 @@ onMounted(() => {
   color: #000;
 }
 
-/* Sephora White Kartı */
+/* KART RESMİ BOYUTU */
 .card-img {
-  width: 70px;
+  width: 70px; /* Görsel boyutunu buradan ayarlayabilirsin */
   height: auto;
   object-fit: contain;
 }
@@ -275,6 +281,7 @@ onMounted(() => {
   color: #000; 
 }
 
+/* Kırmızı İkon ve Yazı */
 .red-icon { color: #D3004C; } 
 .active-item .menu-text { color: #D3004C; font-weight: 800; }
 
@@ -293,11 +300,11 @@ onMounted(() => {
   width: 100%; 
   padding: 15px; 
   background-color: white; 
-  border: 1px solid #000; 
+  border: 1px solid #000; /* Siyah Çerçeve */
   font-weight: 700; 
   font-size: 15px;
   cursor: pointer; 
-  border-radius: 8px; 
+  border-radius: 8px; /* Köşeler Oval */
   color: #000;
   transition: all 0.2s;
 }
@@ -309,40 +316,53 @@ onMounted(() => {
 /* SAĞ İÇERİK */
 .main-content { flex: 1; }
 .page-heading { font-size: 28px; font-weight: 800; margin-bottom: 25px; }
+.status-msg { padding: 40px; text-align: center; color: #666; font-style: italic; }
+.content-body { padding: 40px 0; }
 .description-text { font-size: 14px; line-height: 1.6; margin-bottom: 25px; color: #333; }
-.main-login-btn { display: inline-flex; justify-content: center; align-items: center; background-color: #000; color: #fff; width: 250px; height: 48px; font-weight: 700; text-decoration: none; border-radius: 4px; }
 .continue-link { color: #D3004C; font-weight: 700; text-decoration: underline; }
 
-/* FAVORİ KARTLARI IZGARASI */
-.favorites-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 20px;
-}
+/* SİPARİŞ LİSTESİ */
+.orders-list { display: flex; flex-direction: column; gap: 20px; }
 
-.fav-card {
-    background: white;
-    border: 1px solid #eee;
-    padding: 15px;
+.order-card {
+    background-color: white;
+    border: 1px solid #e0e0e0;
     border-radius: 8px;
+    overflow: hidden; 
+}
+
+.order-header {
+    background-color: #f9f9f9;
+    padding: 15px 20px;
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
-    text-align: center;
-    transition: box-shadow 0.2s;
+    border-bottom: 1px solid #eee;
 }
-.fav-card:hover { box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
 
-.fav-img { width: 100%; height: 150px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
-.fav-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
-
-.fav-info h3 { font-size: 14px; font-weight: 700; margin: 0 0 5px 0; height: 40px; overflow: hidden; }
-.fav-info .price { font-weight: bold; font-size: 15px; margin-bottom: 15px; }
-
-.remove-fav-btn {
-    background: none; border: 1px solid #ddd; padding: 5px 15px; cursor: pointer; font-size: 12px; border-radius: 4px;
+.header-left { display: flex; gap: 10px; align-items: center; }
+.date-label, .total-label { font-size: 13px; color: #666; }
+.order-date { font-weight: 700; font-size: 14px; margin-right: 10px; }
+.status-badge { 
+    background-color: #fff3cd; color: #856404; 
+    padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
 }
-.remove-fav-btn:hover { background: #000; color: white; border-color: #000; }
+.header-right { display: flex; gap: 10px; align-items: center; }
+.total-price { font-weight: 800; font-size: 16px; color: #000; }
+
+.order-items { padding: 20px; }
+.order-item-row { display: flex; gap: 20px; margin-bottom: 15px; align-items: center; border-bottom: 1px solid #f5f5f5; padding-bottom: 15px; }
+.order-item-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.item-img { 
+    width: 70px; height: 70px; border: 1px solid #eee; 
+    display: flex; align-items: center; justify-content: center; 
+    border-radius: 4px; padding: 5px;
+}
+.item-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.placeholder { width: 100%; height: 100%; background-color: #eee; }
+.item-info { display: flex; flex-direction: column; }
+.item-name { font-size: 14px; font-weight: 700; margin: 0 0 5px 0; color: #000; }
+.item-qty { font-size: 13px; color: #666; margin: 0; }
 
 @media (max-width: 1000px) {
   .layout-container { flex-direction: column; gap: 30px; }

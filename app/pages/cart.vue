@@ -1,16 +1,58 @@
 <script setup lang="ts">
 import { useCartStore } from '~/stores/cart'
+import { useOrderStore } from '~/stores/orderStore' // Yeni store'u ekledik
+import { getAuth } from 'firebase/auth' // Auth kontrolü için
 
-// 1. Store'u çağır
+// 1. Store'ları çağır
 const cartStore = useCartStore()
+const orderStore = useOrderStore() // Sipariş store'u
 
 // 2. Çift Header sorununu çözmek için bu sayfada boş layout kullan
 definePageMeta({
   layout: 'custom'
 })
 
-// NOT: Elle 'computed' hesaplamasına gerek yok!
-// cartStore.totalPrice zaten bize en doğru sonucu veriyor.
+// Adet değişince çalışacak fonksiyon
+const handleQuantityChange = (itemId: string, event: Event) => {
+  const target = event.target as HTMLSelectElement
+  const newQuantity = parseInt(target.value)
+  // Store'daki güncelleme fonksiyonunu tetikle
+  cartStore.updateQuantity(itemId, newQuantity)
+}
+
+// --- SİPARİŞİ TAMAMLAMA FONKSİYONU ---
+const handleCheckout = async () => {
+  const auth = getAuth()
+  
+  // 1. Kullanıcı giriş yapmış mı?
+  if (!auth.currentUser) {
+    alert("Sipariş verebilmek için lütfen giriş yapın!")
+    navigateTo('/login')
+    return
+  }
+
+  // 2. Sepet boş mu?
+  if (cartStore.items.length === 0) {
+    alert("Sepetiniz boş!")
+    return
+  }
+
+  try {
+    // 3. Siparişi oluştur (OrderStore kullanılıyor)
+    await orderStore.createOrder(cartStore.items, cartStore.totalPrice)
+    
+    alert("✅ Siparişiniz başarıyla alındı! Teşekkürler.")
+    
+    // 4. Sepeti temizle (CartStore'a eklediğimiz fonksiyon)
+    cartStore.clearCart()
+    
+    // 5. Anasayfaya yönlendir
+    navigateTo('/') 
+  } catch (error) {
+    console.error("Sipariş hatası:", error)
+    alert("Sipariş oluşturulurken bir hata oluştu.")
+  }
+}
 </script>
 
 <template>
@@ -63,21 +105,27 @@ definePageMeta({
                   <h3>SEPHORA COLLECTION</h3>
                   <span class="heart-icon">♡</span>
                 </div>
-                <p class="item-name">{{ item.name }}</p>
+                <NuxtLink :to="`/product/${item.id}`" class="item-name">{{ item.name }}</NuxtLink>
                 <p class="item-variant">Standart Boy</p>
 
                 <div class="actions">
-                  <select class="qty-select" :value="item.quantity || 1">
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
+                  <select 
+                    class="qty-select" 
+                    :value="item.quantity || 1"
+                    @change="handleQuantityChange(item.id, $event)"
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
                   </select>
                   <button @click="cartStore.removeFromCart(item.id)" class="remove-btn">KALDIR</button>
                 </div>
               </div>
 
               <div class="item-price">
-                {{ typeof item.price === 'number' ? item.price + ' TL' : item.price }}
+                {{ cartStore.getItemTotal(item) }}
               </div>
             </div>
           </div>
@@ -130,7 +178,7 @@ definePageMeta({
           </div>
           <p class="tax-info">KDV dahil</p>
 
-          <button class="checkout-btn">Alışverişi tamamla</button>
+          <button @click="handleCheckout" class="checkout-btn">Alışverişi tamamla</button>
 
         </div>
 
@@ -297,7 +345,15 @@ definePageMeta({
   font-size: 18px;
 }
 
-.item-name { font-size: 14px; margin-bottom: 5px; color: #333; }
+.item-name { 
+  font-size: 14px; 
+  margin-bottom: 5px; 
+  color: #333; 
+  text-decoration: none; 
+  display: block; 
+}
+.item-name:hover { text-decoration: underline; }
+
 .item-variant { font-size: 13px; color: #666; margin-bottom: 20px; }
 
 .actions {
